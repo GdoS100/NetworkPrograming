@@ -1,45 +1,99 @@
-#define BUF_SIZE 256 
-#include<sys/socket.h>
-#include<unistd.h>
-#include<arpa/inet.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdlib.h>
 
-void DieWithError(char *errorMessage){
-	perror(errorMessage); //•W€ƒGƒ‰[o—Í‚ÉƒGƒ‰[ƒƒbƒZ[ƒW‚ğo‚·B
-	exit(1); //I—¹ƒXƒe[ƒ^ƒXB1ˆÈã‚ğ•Ô‚·‚Æ‚¢‚¤ˆÓ–¡B
-}
-void commun(int sock){
-	char buf[BUF_SIZE];
-	int len_r; //óM•¶š”
-	if((len_r = recv(sock, buf, BUF_SIZE, 0)) <= 0)
-		DieWithError("recv() failed");
-	buf[len_r] = '\0';
-	printf("%s\n", buf);
-	if(send(sock,buf,strlen(buf),0) != strlen(buf))
-		DieWithError("send() sent a message of unexpected bytes");
+#define BUF_SIZE 256
+
+void DieWithError(char *errorMessage) {
+    perror(errorMessage);
+    exit(1);
 }
 
-int main(int argc, char **argv){
-	int cliSock;
-	int servSock = socket(PF_INET,SOCK_STREAM,0);
-	struct sockaddr_in servAddress;
+void commun(int sock) {
+    char buf[BUF_SIZE];
+	char buf_old[BUF_SIZE];
+	char buf2[2*BUF_SIZE];
+    int len_r;
+	char response[BUF_SIZE];
+
+    while((len_r = recv(sock, buf, BUF_SIZE, 0)) > 0){
+        buf[len_r] = '\0';
+    	sprintf(buf2,"%s%s",buf_old,buf);
+    	
+    	if(strstr(buf2,"/r/n/r/n")){
+    		break;
+    	}
+    	
+    	sprintf(buf_old,"%s",buf); //sprintf:printfã§æ–‡å­—åˆ—ã‚’è¡¨ç¾ã€‚
+
+        printf("%s\n", buf);
+
+        if (strstr(buf, "\r\n\r\n")) {
+            break;
+        }
+    }
+
+    if (len_r <= 0)
+        DieWithError("received() failed.");
+    
+    printf("received HTTP Request.\n");
+
+    sprintf(response, "HTTP/1.1 200 OK\r\n");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+    
+    sprintf(response, "Content-Type: text/html; charset=utf-8\r\n");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+        
+    sprintf(response, "\r\n");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+    
+    sprintf(response, "<!DOCTYPE html><html><head><title>");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+    
+    sprintf(response, "ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ—ãƒ­ã‚°ãƒ©ãƒŸãƒ³ã‚°ã®webã‚µã‚¤ãƒˆ");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+    
+    sprintf(response, "</title></head><body>ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ€ã‚¤ã‚¹ã‚­</body></html>");
+    if(send(sock, response, strlen(response), 0) != strlen(response))
+        DieWithError("send() sent a message of unexpected bytes");
+}
+
+int main(int argc, char *argv[]) {
 	struct sockaddr_in clientAddress;
-	int szClientAddr;
+	unsigned int szClientAddr;
+	int cliSock;
+
+	int servSock = socket(PF_INET, SOCK_STREAM, 0);
+    if (servSock < 0)
+        DieWithError("socket() failed");
     
-	servAddress.sin_family = AF_INET;
-	servAddress.sin_addr.s_addr = htonl(INADDR_ANY); //INADDR_ANY:ƒCƒ“ƒ^[ƒlƒbƒg‚ÌƒAƒhƒŒƒX‚¾‚Á‚½‚ç‚È‚ñ‚Å‚à‚¢‚¢
-	servAddress.sin_port = htons(80); //10001”Ô‚Ìƒ|[ƒg‚ÉÚ‘±‚µ‚Ä‚«‚½‚ç‘Î‰‚·‚éB
-	bind(servSock,(struct sockaddr*)&servAddress,sizeof(servAddress)); //servSock:‘Ò‚¿ó‚¯ê—p
-	listen(servSock,5); //5l‚Ü‚Å‡”Ô‘Ò‚¿‚Å‚«‚éB
-	while(1){
-    	szClientAddr = sizeof(clientAddress);
-    	cliSock = accept(servSock,(struct sockaddr*)&clientAddress,&szClientAddr);
-    	commun(cliSock);
+    struct sockaddr_in servAddress;
+    servAddress.sin_family = AF_INET;
+    servAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+    servAddress.sin_port = htons(80);
+
+	bind(servSock, (struct sockaddr*)&servAddress, sizeof(servAddress));
+
+	listen(servSock, 5);
+
+	while (1) {
+		szClientAddr = sizeof(clientAddress);
+		cliSock = accept(servSock, (struct sockaddr *)&clientAddress, &szClientAddr);
+
+		commun(cliSock);
+
+		close(cliSock);
 	}
-    
-	close(servSock);
-    
-	return 0;
+
+    close(servSock);
+    return 0;
 }
