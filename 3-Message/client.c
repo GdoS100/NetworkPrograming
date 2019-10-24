@@ -80,6 +80,8 @@ void commun(int sock)
     case '2':
         break;
     }
+    printf("%luバイト\n", sizeof(char) * strlen(msg));
+    // 送信処理
     if (send(sock, msg, strlen(msg), 0) != strlen(msg))
         DieWithError("send() sent a message of unexpected bytes");
     // 受信処理
